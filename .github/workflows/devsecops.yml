@@ -6,8 +6,8 @@ on:
       - feature/ci-security-pipeline
 
 jobs:
+  # --- Etapa 1: SAST con SonarCloud ---
   sast:
-
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -20,3 +20,41 @@ jobs:
             -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ secrets.SONAR_ORG }}
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+
+  # --- Etapa 2: SCA con OWASP Dependency-Check ---
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run Dependency Check
+        uses: dependency-check/Dependency-Check_Action@v3
+        with:
+          project: "DevSecOps-Lab"
+          format: "HTML"
+          failOnCVSS: 5.0  # Falla si hay vulnerabilidades >= Media
+
+  # --- Etapa 3: Construcción de Imagen Docker ---
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: docker build -t devsecops-app .
+
+  # --- Etapa 4: Image Security con Trivy ---
+  image-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Scan Docker Image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: devsecops-app
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: 1  # Falla si encuentra vulnerabilidades
